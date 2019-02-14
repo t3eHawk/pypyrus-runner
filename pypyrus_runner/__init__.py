@@ -1,6 +1,8 @@
-from .job import Job
-from .manager import Manager
-from .scheduler import Scheduler
+# from .core.job import Job
+# from .core.config import Config
+from .core.manager import Manager
+# from .core.schedule import Schedule
+# from .core.scheduler import Scheduler
 
 __author__ = 'Timur Faradzhov'
 __copyright__ = 'Copyright 2019, The Pypyrus Runner Project'
@@ -12,4 +14,4 @@ __maintainer__ = 'Timur Faradzhov'
 __email__ = 'timurfaradzhov@gmail.com'
 __status__ = 'Production'
 
-__doc__ = 'Python scheduler and job manager.'
+__desc__ = 'Python scheduler and job manager.'
