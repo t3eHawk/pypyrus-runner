@@ -4,6 +4,8 @@ import pypyrus_runner as runner
 with open('README.md', 'r') as fh:
     long_description = fh.read()
 
+install_requires = ['pypyrus-tables>=0.0.2', 'pypyrus-logbook>=0.0.2']
+
 author = runner.__author__
 email = runner.__email__
 version = runner.__version__
@@ -20,9 +22,7 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     license=license,
     url='https://github.com/t3eHawk/runner',
-    install_requires=[
-        'pypyrus-tables>=0.0.2', 'pypyrus-logbook>=0.0.2',
-        'pyramid>=1.10.2', 'waitress>=1.2.1'],
+    install_requires=install_requires,
     packages=setuptools.find_packages(),
     classifiers=[
         'Programming Language :: Python :: 3',

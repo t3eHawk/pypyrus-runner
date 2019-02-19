@@ -1,4 +1,4 @@
-help_notes = {
+helper = {
 'main': [
 '',
 'List of available commands:',
