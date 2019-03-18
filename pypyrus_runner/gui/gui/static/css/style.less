@@ -1,0 +1,338 @@
+// Pallete
+@black: #1b1b1b;
+@white: #e7e7e7;
+@dark: #2c2c30;
+@light: #7f8d8e;
+@grey: #afafaf;
+@yellow: #f1c40e;
+@purple: #5758bb;
+@blue: #2980b9;
+@dark-blue: #4c6685;
+@turquoise: #169f84;
+@red: #c1392b;
+@pink: #eb3b5a;
+@green: #21bf6b;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow-y: hidden;
+}
+
+body {
+  background-color: @dark;
+  font-family: "Trebuchet MS", Helvetica, sans-serif;
+  a {
+    text-decoration: none;
+  }
+}
+
+header {
+  float: left;
+  width: 100%;
+  height: 60px;
+  background-color: @yellow;
+  z-index: 1;
+
+  h1 {
+    color: black;
+    font-size: 1.5em;
+  }
+
+  .title {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    float: left;
+    width: 250px;
+    height: 100%;
+  }
+
+  .panel {
+    display: flex;
+    align-items: center;
+    float: left;
+    width: calc(100% - 250px);
+    height: 100%;
+  }
+}
+
+nav {
+  float: left;
+  width: 250px;
+  height: calc(100% - 80px);
+  overflow-y: auto;
+  z-index: 1;
+  border-right: 1px solid @black;
+
+  .menu {
+    a {
+      display: flex;
+      align-items: center;
+      height: 60px;
+      color: @white;
+      font-weight: bold;
+      font-size: 1em;
+      text-indent: 10px;
+      &:hover {
+        background-color: @purple;
+      }
+    }
+    .active {
+      background-color: @purple;
+    }
+  }
+}
+
+main {
+  float: left;
+  width: calc(100% - 250px);
+  height: calc(100% - 80px);
+
+  .content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  .tools {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 200px;
+  }
+
+  .data {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    float: left;
+    width: 100%;
+    height: calc(100% - 200px);
+    .feed {
+      height: 95%;
+    }
+  }
+
+  .feed {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 95%;
+    height: 90%;
+  }
+}
+
+footer {
+  float: left;
+  width: 100%;
+  height: 20px;
+  background-color: @black;
+  z-index: 1;
+
+  .rights {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    float: right;
+    width: 250px;
+    height: 100%;
+    color: @grey;
+    font-size: 0.6em;
+  }
+}
+
+.schedule {
+  &-buttons {
+    width: 95%;
+    height: 70%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    a {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-flow: column wrap;
+      color: @white;
+      width: 12%;
+      height: 80%;
+      font-weight: bold;
+    }
+  }
+
+  &-table {
+    width: 95%;
+    height: 100%;
+    background-color: rgb(175, 175, 175);
+    border: 10px solid rgb(175, 175, 175);
+  }
+}
+
+.history {
+  &-buttons {
+    width: 95%;
+    height: 70%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    a {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-flow: column wrap;
+      color: @white;
+      width: 12%;
+      height: 80%;
+      font-weight: bold;
+    }
+  }
+
+  &-table {
+    width: 95%;
+    height: 100%;
+    background-color: rgb(175, 175, 175);
+    border: 10px solid rgb(175, 175, 175);
+  }
+}
+
+.jobs {
+
+  &-feed {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 90%;
+    height: 100%;
+    padding-top: 60px;
+  }
+
+  &-buttons {
+    display: flex;
+    align-items: center;
+    flex-flow: row wrap;
+    width: 100%;
+    height: 100%;
+
+    a {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-flow: column wrap;
+      width: calc((100% - 90px)/6);
+      height: 60px;
+      margin: 7px;
+      background: @purple;
+      color: @white;
+      font-weight: bold;
+
+      &:hover {
+        background-color: @white;
+        color: @black;
+      }
+    }
+  }
+}
+
+.job {
+  &-create {
+    background-color: @blue;
+  }
+  &-active {
+    background-color: @turquoise;
+  }
+  &-inactive {
+    background-color: @red;
+  }
+  &-monthly {
+    background-color: @pink;
+  }
+  &-weekly {
+    background-color: @grey;
+  }
+  &-daily {
+    background-color: @green;
+  }
+  &-hourly {
+    background-color: @dark-blue;
+  }
+}
+
+.button {
+  &:hover {
+    background-color: @purple;
+  }
+}
+
+.table {
+  width: 100%;
+  height: 100%;
+
+  table {
+    width: 100%;
+    height: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    overflow-y: scroll;
+    background-color: @grey;
+    color: @black;
+  }
+
+  &-head {
+    border-bottom: 1px solid darken(rgb(175, 175, 175), 15%);
+
+    thead {
+      th {
+        height: 50px;
+        font-size: 0.9em;
+        text-align: left;
+        text-transform: uppercase;
+      }
+    }
+  }
+
+  &-body {
+    width: 100%;
+    height: calc(100% - 50px);
+    border-top: 1px solid darken(rgb(175, 175, 175), 15%);
+    overflow-x: auto;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    tbody {
+      tr {
+        &:nth-child(odd):hover, &:nth-child(even):hover {
+          background-color: lighten(rgb(87, 88, 187), 25%);
+        }
+
+        &:nth-child(odd) {
+          background-color: rgb(175, 175, 175);
+        }
+
+        &:nth-child(even) {
+          background-color: darken(rgb(175, 175, 175), 2%);
+        }
+      }
+
+      td {
+        height: 39px;
+        font-size: 0.8em;
+        text-align: left;
+      }
+    }
+  }
+}
