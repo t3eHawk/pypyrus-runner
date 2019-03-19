@@ -9,7 +9,7 @@ class Trigger():
     def scan(self):
         now = time.localtime(self.scheduler.moment)
         compare = self.compare
-        for job in self.scheduler.storage.schedule:
+        for job in self.scheduler.schedule:
             if job['status'] == 'Y':
                 if compare(job['month_day'], now.tm_mday) is True:
                     if compare(job['week_day'], now.tm_wday) is True:

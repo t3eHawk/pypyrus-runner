@@ -12,7 +12,7 @@ class Config():
             else: folder = os.path.abspath(os.path.dirname(sys.argv[0]))
 
             if hasattr(visitor, 'log') is True: log = visitor.log
-            else: log = logbook.Log('config', file=False, console=True)
+            else: log = logbook.Logger('config', file=False, console=True)
 
             path = os.path.abspath(f'{folder}/job.ini')
             FILES = [path]

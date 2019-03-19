@@ -6,8 +6,8 @@ import pypyrus_logbook as logbook
 
 from .trigger import Trigger
 from ..operator import Operator
-from ..tools.config import Config
-from ..tools.storage import Storage
+from ..config import Config
+from ..database import Database
 
 class Scheduler():
     """Class describing the scheduler and its API."""
@@ -30,17 +30,18 @@ class Scheduler():
         self.showdelay = showdelay or config['DEBUG'].getboolean('showdelay')
 
         # Initialize log object using some parameters.
-        self.log = logbook.Log(
+        self.log = logbook.Logger(
             self.name, desc=self.desc,
             console=config['LOG'].getboolean('console'),
             limit_by_day=config['LOG'].getboolean('limit_by_day'),
             limit_by_size=config['LOG'].getboolean('limit_by_size'),
             max_size=config['LOG'].getint('max_size'),
             err_formatting=config['ERROR'].getboolean('formatting'),
-            alarming=config['ERROR'].getboolean('alarming'))
+            alarming=config['ERROR'].getboolean('alarming'),
+            debug=config['LOG'].getboolean('debug'))
 
         self.operator = Operator(self)
-        self.storage = Storage(self)
+        self.database = Database(self)
         self.trigger = Trigger(self)
         pass
 
@@ -48,7 +49,7 @@ class Scheduler():
         """Launch the scheduler."""
         self.log
         self.log.head()
-        self.storage.clean_audit()
+        self.database.clean_audit()
         self.log.info(f'Scheduler <{self.name}> STARTED.')
         self.sked()
         self.sync_time()
@@ -59,7 +60,7 @@ class Scheduler():
         pass
 
     def sked(self):
-        self.storage.sked()
+        self.schedule = self.database.select_schedule()
         pass
 
     def debug(self):
@@ -73,7 +74,7 @@ class Scheduler():
         pass
 
     def check(self):
-        if self.storage.modified is True:
+        if self.database.modified is True:
             self.sked()
             self.log.info('SCHEDULE WAS UPDATED!')
         pass

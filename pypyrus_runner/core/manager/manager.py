@@ -7,8 +7,8 @@ from datetime import datetime
 
 from .help import helper
 from ..operator import Operator
-from ..tools.config import Config
-from ..tools.storage import Storage
+from ..config import Config
+from ..database import Database
 
 class Manager():
     """
@@ -17,14 +17,15 @@ class Manager():
     """
     def __init__(self):
         # Define root directroy and move to it.
-        root = os.path.abspath(os.path.dirname(sys.argv[0]))
+        home = os.getenv('PYPYRUS_RUNNER_HOME')
+        root = home or os.path.abspath(os.path.dirname(sys.argv[0]))
         deployed = os.path.exists(f'{root}/scheduler.py')
         os.chdir(root)
 
         self.root = root
         self.deployed = deployed
 
-        self.log = logbook.Log('manager', file=False, console=True)
+        self.log = logbook.Logger()
         self.log.configure(format='{rectype}: {message}\n')
 
         self.config = Config(self)
@@ -110,17 +111,13 @@ class Manager():
         log = self.log
         operator = self.operator
         jobs = operator.list_jobs()
-
         rows = []
         for i, job in enumerate(jobs):
             if i == 0:
-                row = list([key.upper() for key in job.keys()])
-                rows.append(row)
-            if hasattr(job, 'values') is True:
-                row = job.values()
-            else:
-                row = list([str(cell) for cell in job])
-            rows.append(row)
+                header = list([key.upper() for key in job.keys()])
+                rows.append(header)
+            data = list([str(cell) for cell in job.values()])
+            rows.append(data)
 
         if len(rows) >= 1:
             table = tables.Table(rows=rows)
@@ -154,15 +151,14 @@ class Manager():
             required=False, action='store_true')
         log.sysinfo.process()
         args = log.sysinfo.anons[2:]
-        print(args)
         yes = log.sysinfo.args.yes
         if len(args) == 0:
             log.error('You need to point the job ID!')
         else:
             log.subhead('run job')
-            storage = Storage(self)
+            database = Database(self)
             id = kwargs.get('id', args[0])
-            job = storage.describe(id=id)
+            job = database.select_job(id=id)
             if job is None:
                 log.warning(f'No job with ID <{id}> was found!')
             else:
@@ -183,7 +179,7 @@ class Manager():
                 log.info(f'Time <{time_for_log}>')
                 if yes is False:
                     while True:
-                        sure = input('\nAre you sure Y/n?\n')
+                        sure = input('Are you sure Y/n? ')
                         if sure in ('Y', 'n'):
                             yes = True if sure == 'Y' else False
                             break
@@ -226,9 +222,9 @@ class Manager():
             log.error('You need to point the job ID!')
         else:
             log.subhead('delete job')
-            storage = Storage(self)
+            db = Database(self)
             id = args[0]
-            job = storage.describe(id=id)
+            job = db.select_job(id=id)
             if job is None:
                 log.warning(f'No job with ID <{id}> was found!')
             else:
@@ -239,7 +235,7 @@ class Manager():
                 log.info(f'Name <{name}>')
                 log.info(f'Description <{desc}>')
                 while True:
-                    sure = input('\nAre you sure Y/n?\n')
+                    sure = input('Are you sure Y/n? ')
                     if sure in ('Y', 'n'):
                         break
                 if sure == 'Y':

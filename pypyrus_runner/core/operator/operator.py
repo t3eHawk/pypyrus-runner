@@ -8,8 +8,8 @@ import pypyrus_logbook as logbook
 
 from datetime import datetime
 
-from ..tools.config import Config
-from ..tools.storage import Storage
+from ..config import Config
+from ..database import Database
 
 class Operator():
     def __init__(self, manager=None, log=None, root=None):
@@ -19,32 +19,29 @@ class Operator():
             log = manager.log
             root = manager.root
 
-        log = log or logbook.Log('operator', file=False, console=True)
-        root = root or os.path.abspath(os.path.dirname(sys.argv[0]))
+        log = log or logbook.Logger()
+        home = os.getenv('PYPYRUS_RUNNER_HOME')
+        root = root or home or os.path.abspath(os.path.dirname(sys.argv[0]))
         os.chdir(root)
 
         self.log = log
         self.root = root
         pass
 
-    def create_scheduler(self, name, desc, db=True):
+    def create_scheduler(self, name, desc):
         root = self.root
         log = self.log
-        app = os.path.abspath(f'{__file__}/../../../app/scheduler')
+        app = os.path.abspath(f'{__file__}/../../../app')
 
         name = name or 'runner'
         desc = desc or 'Runner'
 
         log.info(f'Creating scheduler <{name}>...')
 
-        path = os.path.abspath(f'{root}/scheduler.py')
-        database = os.path.abspath(f'{root}/db') if db is True else None
-        schedule = 'schedule' if db is True else os.path.abspath(
-            f'{root}/schedule')
+        scheduler = os.path.abspath(f'{root}/scheduler.py')
         jobs = os.path.abspath(f'{root}/jobs')
 
-        config = Config(
-            self, name=name, desc=desc, database=database, schedule=schedule)
+        config = Config(self, name=name, desc=desc)
         folders = [jobs]
         for folder in folders:
             if os.path.exists(folder) is False:
@@ -52,7 +49,7 @@ class Operator():
                 log.info(f'Folder {folder} created.')
             else:
                 log.warning(f'Folder {folder} already exists!')
-        files = [path, database if db is True else schedule]
+        files = [scheduler]
         for file in files:
             filename = os.path.basename(file)
             if os.path.exists(file) is False:
@@ -62,6 +59,9 @@ class Operator():
                     log.info(f'File {file} created.')
             else:
                 log.warning(f'File {file} already exists!')
+
+        db = Database(self)
+        log.info(f'Schema deployed at {db.path}.')
         pass
 
     def create_job(
@@ -72,9 +72,7 @@ class Operator():
         app = os.path.abspath(f'{__file__}/../../../app/job')
         root = self.root
         config = Config(self)
-
-        database = config['SCHEDULER'].get('database')
-        schedule = config['SCHEDULER'].get('schedule')
+        db = Database(self)
 
         jobs = tuple(map(lambda folder: int(folder), os.listdir('jobs/')))
         id = max(jobs) + 1 if len(jobs) > 0 else 0
@@ -92,7 +90,7 @@ class Operator():
         hour = hour or '*'
         minute = minute or '*'
         second = second or '*'
-        parameters = ''
+        params = ''
         status = 'N'
 
         log.info(f'Creating job with ID <{id}>...')
@@ -115,44 +113,24 @@ class Operator():
             else:
                 log.warning(f'File {file} already exists!')
 
-        if database is not None:
-            db = sqlite3.connect(database)
-            cursor = db.cursor()
-            insert = (
-                f"INSERT INTO {schedule} (id, name, description, "\
-                "environment, file, month_day, week_day, "\
-                "hour, minute, second, parameters, status) VALUES ("\
-                f"{id}, '{name}', '{desc}', '{env}', '{job}', "\
-                f"'{month_day}', '{week_day}', "\
-                f"'{hour}', '{minute}', '{second}', "\
-                f"'{parameters}', '{status}')\n")
-            try:
-                cursor.execute(insert)
-                db.commit()
-            except:
-                log.error(f'Job <{name}> was not added to schedule!')
-                log.error()
-            else:
-                log.info(f'Job <{name}> successfully added to schedule!')
+        insert = db.schedule.insert().values(
+            id=id, name=name, description=desc, environment=env, file=job,
+            month_day=month_day, week_day=week_day, hour=hour,
+            minute=minute, second=second, parameters=params, status=status)
+
+        try:
+            db.connection.execute(insert)
+        except:
+            log.error(f'Job <{name}> was not added to schedule!')
+            log.error()
         else:
-            try:
-                with open(schedule, 'a') as fh:
-                    fh.write(
-                        f'{id}\t{name}\t{desc}\t{env}\t{job}\t'\
-                        f'{month_day}\t{week_day}\t'\
-                        f'{hour}\t{minute}\t{second}\t'\
-                        f'{parameters}\t{status}\n')
-            except:
-                log.error(f'Job <{name}> was not added to schedule!')
-                log.error()
-            else:
-                log.info(f'Job <{name}> successfully added to schedule!')
+            log.info(f'Job <{name}> successfully added to schedule!')
         pass
 
     def list_jobs(self):
-        storage = Storage(self)
-        storage.sked()
-        return storage.schedule
+        db = Database(self)
+        jobs = db.select_schedule()
+        return jobs
 
     def edit_schedule(self):
         print('Not configured yet.')
@@ -164,26 +142,15 @@ class Operator():
 
     def enable_job(self, id):
         log = self.log
-        storage = Storage(self)
-        db = storage.db
-        if db is not None:
-            cursor = storage.cursor
-            table = storage.table
-            select = f'SELECT COUNT(*) FROM {table} WHERE id = {id}'
-            count = cursor.execute(select).fetchone()[0]
-            if count == 1:
-                try:
-                    update = (
-                        f"UPDATE {table} SET status = 'Y' WHERE id = {id}")
-                    cursor.execute(update)
-                    db.commit()
-                except:
-                    log.critical()
-                else:
-                    log.info(f'Job with id <{id}> was enabled.')
-            else:
-                log.warning(f'No job with id <{id}> was found!')
-
+        db = Database(self)
+        schedule = db.schedule
+        try:
+            update = schedule.update().values(status='Y').where(schedule.c.id == id)
+            db.connection.execute(update)
+        except:
+            log.critical()
+        else:
+            log.info(f'Job with id <{id}> was enabled.')
         pass
 
     def run_job(self, job, time):
@@ -209,48 +176,30 @@ class Operator():
 
     def disable_job(self, id):
         log = self.log
-        storage = Storage(self)
-        db = storage.db
-        if db is not None:
-            cursor = storage.cursor
-            table = storage.table
-            select = f'SELECT COUNT(*) FROM {table} WHERE id = {id}'
-            count = cursor.execute(select).fetchone()[0]
-            if count == 1:
-                try:
-                    update = (
-                        f"UPDATE {table} SET status = 'N' WHERE id = {id}")
-                    cursor.execute(update)
-                    db.commit()
-                except:
-                    log.critical()
-                else:
-                    log.info(f'Job with id <{id}> was disabled.')
-            else:
-                log.warning(f'No job with id <{id}> was found!')
+        db = Database(self)
+        schedule = db.schedule
+        try:
+            update = schedule.update().values(status='N').where(schedule.c.id == id)
+            db.connection.execute(update)
+        except:
+            log.critical()
+        else:
+            log.info(f'Job with id <{id}> was disabled.')
         pass
 
     def delete_job(self, id):
         log = self.log
         root = self.root
-        storage = Storage(self)
-        db = storage.db
-        if db is not None:
-            cursor = storage.cursor
-            table = storage.table
-            select = f'SELECT COUNT(*) FROM {table} WHERE id = {id}'
-            count = cursor.execute(select).fetchone()[0]
-            if count == 1:
-                try:
-                    delete = f"DELETE FROM {table} WHERE id = {id}"
-                    cursor.execute(delete)
-                    db.commit()
-                except:
-                    log.critical()
-                else:
-                    log.info(f'Record in <{table}> was DELETED.')
-            else:
-                log.warning(f'No job with id <{id}> was found!')
+        db = Database(self)
+        schedule = db.schedule
+
+        try:
+            delete = schedule.delete().where(schedule.c.id == id)
+            db.connection.execute(delete)
+        except:
+            log.critical()
+        else:
+            log.info('Record in schedule was DELETED.')
 
         try:
             folder = os.path.abspath(f'{root}/jobs/{id}')

@@ -8,11 +8,16 @@ class Config():
     def __new__(self, visitor, custom=None, *args, **kwargs):
         v_class = visitor.__class__.__name__
 
-        if hasattr(visitor, 'root') is True: root = visitor.root
-        else: root = os.path.abspath(os.path.dirname(sys.argv[0]))
+        if hasattr(visitor, 'root') is True:
+            root = visitor.root
+        else:
+            home = os.getenv('PYPYRUS_RUNNER_HOME')
+            root = home or os.path.abspath(os.path.dirname(sys.argv[0]))
 
-        if hasattr(visitor, 'log') is True: log = visitor.log
-        else: log = logbook.Log('config', file=False, console=True)
+        if hasattr(visitor, 'log') is True:
+            log = visitor.log
+        else:
+            log = logbook.Logger()
 
         path = os.path.abspath(f'{root}/config.ini')
         FILES = [path]
@@ -39,9 +44,9 @@ class Config():
             'owner': None}
         SCHEDULER = {
             'name': 'runner',
-            'desc': 'Runner',
-            'database': os.path.abspath(f'{root}/db'),
-            'schedule': None}
+            'desc': 'Runner'}
+        DATABASE = {
+            'path': f'{root}/db.sqlite3'}
         LOG = {
             'console': 'False',
             'limit_by_day': 'True',
@@ -70,12 +75,11 @@ class Config():
         if v_class == 'Operator' and deployed is False:
             SCHEDULER['name'] = kwargs.get('name')
             SCHEDULER['desc'] = kwargs.get('desc')
-            SCHEDULER['database'] = kwargs.get('database')
-            SCHEDULER['schedule'] = kwargs.get('schedule')
 
         if v_class == 'Scheduler'\
         or (v_class == 'Operator' and deployed is False):
             default['SCHEDULER'] = SCHEDULER
+            default['DATABASE'] = DATABASE
             default['LOG'] = LOG
             default['EMAIL'] = EMAIL
             default['ERROR'] = ERROR

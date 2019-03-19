@@ -8,8 +8,8 @@ import pypyrus_logbook as logbook
 from datetime import datetime
 
 from .config import Config as JobConfig
-from ..tools.config import Config
-from ..tools.storage import Storage
+from ..config import Config
+from ..database import Database
 
 class Job():
     def __init__(self, name=None, desc=None, config=None, persons=None):
@@ -27,11 +27,11 @@ class Job():
         self.config = config = Config(self)
         self.job_config = job_config = JobConfig(self, custom=config)
 
-        self.storage = storage = Storage(self)
-        self.details = details = storage.describe(file=file)
-        self.ID = details['id']
-        self.NAME = name or details['name']
-        self.DESC = desc or details['description']
+        self.database = database = Database(self)
+        self.details = details = database.select_job(file=file)
+        self.id = details['id']
+        self.name = name or details['name']
+        self.desc = desc or details['description']
 
         # Emails for information and notifications.
         owner = config['MANAGER'].get('owner')
@@ -39,8 +39,8 @@ class Job():
         self.persons = []
         if owner is not None: self.persons.extend(owner.split())
         if persons is not None: self.persons.extend(persons.split())
-        self.log = log = logbook.Log(
-            self.NAME, desc=self.DESC,
+        self.log = log = logbook.Logger(
+            self.name, desc=self.desc,
             console=job_config['LOG'].getboolean('console'),
             limit_by_day=job_config['LOG'].getboolean('limit_by_day'),
             limit_by_size=job_config['LOG'].getboolean('limit_by_size'),
@@ -66,12 +66,12 @@ class Job():
             required=False, action='store_true')
         log.sysinfo.process()
 
-        self.TIME = log.sysinfo.args.time
-        self.AUTO = log.sysinfo.args.auto
+        self.time = log.sysinfo.args.time
+        self.auto = log.sysinfo.args.auto
 
         scheduler = config['SCHEDULER'].get('name').upper()
         user = log.sysinfo.stat['user'].upper()
-        self.INITIATOR = scheduler if self.AUTO is True else user
+        self.initiator = scheduler if self.auto is True else user
         pass
 
     def run(self):
@@ -83,15 +83,14 @@ class Job():
     def open(self):
         """Open the job."""
         self.START_TIMESTAMP = datetime.now()
-        job_id=self.ID
-        job_time = self.TIME.isoformat(sep=' ', timespec='seconds')
         self.log.header.add(
-            pos='end', job_id=job_id, job_time=job_time,
+            pos='end', job=self.id,
+            job_time=self.time.isoformat(sep=' ', timespec='seconds'),
             configs=', '.join(self.job_config.FILES),
             persons=', '.join(self.persons))
         self.log.head()
-        self.process_id = self.storage.open_process(
-            job_id = job_id, job_time=job_time, initiator=self.INITIATOR,
+        self.process_id = self.database.open_process(
+            job=self.id, initiator=self.initiator,
             start_timestamp=self.START_TIMESTAMP)
         self.log.info('JOB STARTED.')
         pass
@@ -99,11 +98,12 @@ class Job():
     def close(self):
         """Close the job."""
         self.END_TIMESTAMP = datetime.now()
-        self.storage.close_process(
-            process_id=self.process_id, end_timestamp=self.END_TIMESTAMP)
+        self.database.close_process(
+            process_id=self.process_id, end_timestamp=self.END_TIMESTAMP,
+            error=False)
         spent = self.END_TIMESTAMP - self.START_TIMESTAMP
         self.log.info('JOB FINISHED.')
-        self.log.info(f'TIME SPENT: {spent.seconds} seconds.')
+        self.log.info(f'time SPENT: {spent.seconds} seconds.')
         pass
 
     @property
