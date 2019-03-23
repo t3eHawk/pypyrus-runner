@@ -1,31 +1,30 @@
 import os
 import re
 import sys
+import signal
 import shutil
-import sqlite3
+import datetime
 import subprocess
 import pypyrus_logbook as logbook
-
-from datetime import datetime
 
 from ..config import Config
 from ..database import Database
 
 class Operator():
     def __init__(self, manager=None, log=None, root=None):
-        self.manager = manager
+        self._manager = manager
 
         if manager is not None:
             log = manager.log
             root = manager.root
 
-        log = log or logbook.Logger()
         home = os.getenv('PYPYRUS_RUNNER_HOME')
         root = root or home or os.path.abspath(os.path.dirname(sys.argv[0]))
         os.chdir(root)
+        self._root = root
 
-        self.log = log
-        self.root = root
+        self.log = log or logbook.Logger()
+
         pass
 
     def create_scheduler(self, name, desc):
@@ -62,6 +61,28 @@ class Operator():
 
         db = Database(self)
         log.info(f'Schema deployed at {db.path}.')
+        pass
+
+    def start_scheduler(self):
+        scheduler = os.path.abspath(f'{self._root}/scheduler.py')
+        self.make_process('pythonw', scheduler)
+        pass
+
+    def stop_scheduler(self):
+        database = Database(self)
+        select = database.status.select()
+        result = database.connection.execute(select).first()
+        pid = result['pid']
+        update = database.status.update().\
+            values(end_timestamp=datetime.datetime.now()).\
+            where(database.status.c.pid == pid)
+        database.connection.execute(update)
+        os.kill(pid, signal.SIGINT)
+        pass
+
+    def restart_scheduler(self):
+        self.stop_scheduler()
+        self.start_scheduler()
         pass
 
     def create_job(
@@ -127,17 +148,42 @@ class Operator():
             log.info(f'Job <{name}> successfully added to schedule!')
         pass
 
-    def list_jobs(self):
+    def edit_job(
+        self, id, name=None, desc=None, env=None, params=None, month_day=None,
+        week_day=None, hour=None, minute=None, second=None
+    ):
         db = Database(self)
-        jobs = db.select_schedule()
-        return jobs
-
-    def edit_schedule(self):
-        print('Not configured yet.')
-        pass
-
-    def edit_job(self):
-        print('Not configured yet.')
+        update = db.schedule.update().where(db.schedule.c.id == id)
+        need = False
+        if name:
+            update = update.values(name=name)
+            need = True
+        if desc:
+            update = update.values(description=desc)
+            need = True
+        if env:
+            update = update.values(environment=env)
+            need = True
+        if params:
+            update = update.values(parameters=params)
+            need = True
+        if month_day:
+            update = update.values(month_day=month_day)
+            need = True
+        if week_day:
+            update = update.values(week_day=week_day)
+            need = True
+        if hour:
+            update = update.values(hour=hour)
+            need = True
+        if minute:
+            update = update.values(minute=minute)
+            need = True
+        if second:
+            update = update.values(second=second)
+            need = True
+        if need is True:
+            db.connection.execute(update)
         pass
 
     def enable_job(self, id):
@@ -153,27 +199,6 @@ class Operator():
             log.info(f'Job with id <{id}> was enabled.')
         pass
 
-    def run_job(self, job, time):
-        log = self.log
-        try:
-            env = job['environment']
-            file = job['file']
-            params = job['parameters']
-            params += f' -t {time}'
-            config = Config(self)
-            exe = config['ENVIRONMENT'].get(env)
-            now = datetime.now()
-            log.info(f'Started at {now:%Y-%m-%d %H:%M:%S}.')
-            log.info('Executing...')
-            # Job will run as separate process.
-            self.make_process(exe, file, params).wait()
-        except:
-            log.error()
-        finally:
-            now = datetime.now()
-            log.info(f'Finished at {now:%Y-%m-%d %H:%M:%S}.')
-        pass
-
     def disable_job(self, id):
         log = self.log
         db = Database(self)
@@ -185,6 +210,27 @@ class Operator():
             log.critical()
         else:
             log.info(f'Job with id <{id}> was disabled.')
+        pass
+
+    def run_job(self, job, time):
+        log = self.log
+        try:
+            env = job['environment']
+            file = job['file']
+            params = job['parameters']
+            params += f' -t {time}'
+            config = Config(self)
+            exe = config['ENVIRONMENT'].get(env)
+            now = datetime.datetime.now()
+            log.info(f'Started at {now:%Y-%m-%d %H:%M:%S}.')
+            log.info('Executing...')
+            # Job will run as separate process.
+            self.make_process(exe, file, params).wait()
+        except:
+            log.error()
+        finally:
+            now = datetime.datetime.now()
+            log.info(f'Finished at {now:%Y-%m-%d %H:%M:%S}.')
         pass
 
     def delete_job(self, id):
@@ -212,9 +258,20 @@ class Operator():
         log.info(f'Job with id <{id}> was successfully deleted.')
         pass
 
-    def edit_config(self):
-        print('Not configured yet.')
-        pass
+    def list_jobs(self):
+        db = Database(self)
+        select = db.schedule.select()
+        result = db.connection.execute(select)
+        jobs = list(map(lambda row: dict(row), result))
+        return jobs
+
+    def select_job(self, id):
+        database = Database(self)
+        schedule = database.schedule
+        select = schedule.select().where(schedule.c.id == id)
+        row = database.connection.execute(select).first()
+        job = dict(row) if row is not None else None
+        return job
 
     def make_process(self, exe, file, params=None):
         if exe is not None and re.match(r'^.*(\\|/).*$', exe) is not None:
@@ -226,3 +283,7 @@ class Operator():
             params = params.split()
             command.extend(params)
         return subprocess.Popen(command)
+
+    @property
+    def root(self):
+        return self._root

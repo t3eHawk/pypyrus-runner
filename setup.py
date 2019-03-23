@@ -4,7 +4,9 @@ import pypyrus_runner as runner
 with open('README.md', 'r') as fh:
     long_description = fh.read()
 
-install_requires = ['pypyrus-tables>=0.0.2', 'pypyrus-logbook>=0.0.2']
+install_requires = [
+    'pypyrus-tables>=0.0.2', 'pypyrus-logbook>=0.0.2',
+    'sqlalchemy>=1.3.1']
 
 author = runner.__author__
 email = runner.__email__

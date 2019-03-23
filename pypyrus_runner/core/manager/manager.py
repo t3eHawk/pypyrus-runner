@@ -1,9 +1,10 @@
 import os
 import sys
+import signal
+import datetime
+import platform
 import pypyrus_tables as tables
 import pypyrus_logbook as logbook
-
-from datetime import datetime
 
 from .help import helper
 from ..operator import Operator
@@ -22,8 +23,8 @@ class Manager():
         deployed = os.path.exists(f'{root}/scheduler.py')
         os.chdir(root)
 
-        self.root = root
-        self.deployed = deployed
+        self._root = root
+        self._deployed = deployed
 
         self.log = logbook.Logger()
         self.log.configure(format='{rectype}: {message}\n')
@@ -39,8 +40,8 @@ class Manager():
                 call_func = getattr(self, func)
                 args = self.log.sysinfo.anons
                 # All that goes after second word is the command parameters.
-                if len(args) >= 1 and args[0] == 'help':
-                    self.help(func)
+                if func == 'help' or 'help' in args:
+                    self.help()
                     return
                 # Execute received command with arguments.
                 call_func()
@@ -51,8 +52,10 @@ class Manager():
 
         pass
 
-    def help(self, func='main'):
+    def help(self):
         """Show special application help note."""
+        args = self.log.sysinfo.anons[:2]
+        func = '_'.join(args) or 'main'
         note = helper.get(func)
         note = '\n'.join(note)
         print(note)
@@ -73,6 +76,58 @@ class Manager():
 
         log.bound()
         operator.create_scheduler(name, desc)
+        pass
+
+    def start_scheduler(self):
+        system = platform.system()
+        if system == 'Windows':
+            exe = 'pythonw'
+            params = None
+        elif system == 'Linux':
+            exe = 'python'
+            params = '&'
+        file = os.path.abspath(f'{self._root}/scheduler.py')
+        process = self.operator.make_process(exe, file, params=params)
+        self.log.info(f'Scheduler started at PID <{process.pid}>.')
+        pass
+
+    def stop_scheduler(self):
+        try:
+            database = Database(self)
+            select = database.status.select()
+            result = database.connection.execute(select).first()
+            pid = result['pid']
+            os.kill(pid, signal.SIGINT)
+        except OSError:
+            self.log.warning(f'Scheduler at PID <{pid}> already closed.')
+        else:
+            update = database.status.update().\
+                values(end_timestamp=datetime.datetime.now()).\
+                where(database.status.c.pid == pid)
+            database.connection.execute(update)
+            self.log.info(f'Scheduler at PID <{pid}> stopped.')
+        pass
+
+    def restart_scheduler(self):
+        self.stop_scheduler()
+        self.start_scheduler()
+        pass
+
+    def report_scheduler(self):
+        database = Database(self)
+        select = database.status.select()
+        result = database.connection.execute(select).first()
+        start_timestamp = result['start_timestamp']
+        end_timestamp = result['end_timestamp']
+        pid = result['pid']
+        if end_timestamp is None:
+            self.log.info('Scheduler is working.')
+            self.log.info(
+                f'Started at {start_timestamp:%Y-%m-%d %H:%M:%S} '\
+                f'with PID {pid}.')
+        else:
+            self.log.info('Scheduler is shutdown.')
+            self.log.info(f'Closed at {end_timestamp:%Y-%m-%d %H:%M:%S}')
         pass
 
     def create_job(self):
@@ -106,30 +161,73 @@ class Manager():
             log.warning('Operation was canceled.')
         pass
 
-    def list_jobs(self):
-        """List all jobs in the schedule."""
-        log = self.log
-        operator = self.operator
-        jobs = operator.list_jobs()
-        rows = []
-        for i, job in enumerate(jobs):
-            if i == 0:
-                header = list([key.upper() for key in job.keys()])
-                rows.append(header)
-            data = list([str(cell) for cell in job.values()])
-            rows.append(data)
-
-        if len(rows) >= 1:
-            table = tables.Table(rows=rows)
-            log.write(table)
-        pass
-
-    def edit_schedule(self):
-        print('Not configured yet.')
-        pass
-
     def edit_job(self):
-        print('Not configured yet.')
+        self.log.subhead('edit job')
+        args = self.log.sysinfo.anons[2:]
+        if len(args) < 2:
+            self.log.warning(
+                'You need to point the job ID and the attribute to modify.')
+        else:
+            id = args[0]
+            attribute = args[1]
+            job = self.operator.select_job(id=id)
+            if attribute == 'name':
+                name = job['name']
+                self.log.info(f'Name <{name}>')
+                name = input('Enter new name: ')
+                self.operator.edit_job(id, name=name)
+            elif attribute == 'desc':
+                desc = job['description']
+                self.log.info(f'Description <{desc}>')
+                desc = input('Enter new description: ')
+                self.operator.edit_job(id, desc=desc)
+            elif attribute == 'env':
+                env = job['environment']
+                self.log.info(f'Description <{env}>')
+                env = input('Enter new environment: ')
+                self.operator.edit_job(id, env=env)
+            elif attribute == 'params':
+                params = job['parameters']
+                self.log.info(f'Parameters <{params}>')
+                params = input('Enter new parameters: ')
+                self.operator.edit_job(id, params=params)
+            elif attribute == 'schedule':
+                month_day = job['month_day']
+                self.log.info(f'Month day <{month_day}>')
+                week_day = job['week_day']
+                self.log.info(f'Week day <{week_day}>')
+                hour = job['hour']
+                self.log.info(f'Hour <{hour}>')
+                minute = job['minute']
+                self.log.info(f'Minute <{minute}>')
+                second = job['second']
+                self.log.info(f'Second <{second}>')
+
+                month_day = input(f'Enter new month day: ')
+                week_day = input(f'Enter new week day: ')
+                hour = input('Enter new hour: ')
+                minute = input('Enter new minute: ')
+                second = input('Enter new second: ')
+
+                self.operator.edit_job(
+                    id, month_day=month_day, week_day=week_day, hour=hour,
+                    minute=minute, second=second)
+
+            else:
+                self.log.error(f'Unknown attribute - {attribute}')
+            self.log.info(f'Job with id <{id}> was updated.')
+        pass
+
+    def edit_script(self):
+        """Open script.py of job in the selected editor."""
+        # Get all parameters for edition process.
+        editor = self.config['MANAGER'].get('editor')
+        id = self.log.sysinfo.anons[2]
+        path = os.path.abspath(f'{self._root}/jobs/{id}/script.py')
+        self.log.info(f'Editing {path}...')
+        # Launch edition process and wait until it is completed.
+        self.operator.make_process(editor, path).wait()
+        self.log.info('Done!')
         pass
 
     def enable_job(self):
@@ -139,6 +237,17 @@ class Manager():
         if len(args) >= 1:
             id = args[0]
             operator.enable_job(id)
+        else:
+            log.error('You need to point the job ID!')
+        pass
+
+    def disable_job(self):
+        log = self.log
+        operator = self.operator
+        args = log.sysinfo.anons[2:]
+        if len(args) >= 1:
+            id = args[0]
+            operator.disable_job(id)
         else:
             log.error('You need to point the job ID!')
         pass
@@ -156,9 +265,8 @@ class Manager():
             log.error('You need to point the job ID!')
         else:
             log.subhead('run job')
-            database = Database(self)
             id = kwargs.get('id', args[0])
-            job = database.select_job(id=id)
+            job = self.operator.select_job(id=id)
             if job is None:
                 log.warning(f'No job with ID <{id}> was found!')
             else:
@@ -169,7 +277,7 @@ class Manager():
                 log.info(f'Description <{desc}>')
                 # Time is optional.
                 if len(args) == 1:
-                    now = datetime.now().strftime('%Y-%m-%d/%H:%M:%S')
+                    now = datetime.datetime.now().strftime('%Y-%m-%d/%H:%M:%S')
                     time = kwargs.get('time', now)
                 elif len(args) == 2:
                     time = f'{args[1]}'
@@ -189,7 +297,6 @@ class Manager():
                     log.warning('Operation was canceled.')
         pass
 
-
     def run_jobs(self):
         """Execute the list of jobs from the file."""
         args = self.log.sysinfo.anons[2:]
@@ -203,17 +310,6 @@ class Manager():
             self.run_job(id=id, time=time)
         pass
 
-    def disable_job(self):
-        log = self.log
-        operator = self.operator
-        args = log.sysinfo.anons[2:]
-        if len(args) >= 1:
-            id = args[0]
-            operator.disable_job(id)
-        else:
-            log.error('You need to point the job ID!')
-        pass
-
     def delete_job(self):
         """Delete the job by id."""
         log = self.log
@@ -222,9 +318,8 @@ class Manager():
             log.error('You need to point the job ID!')
         else:
             log.subhead('delete job')
-            db = Database(self)
             id = args[0]
-            job = db.select_job(id=id)
+            job = self.operator.select_job(id=id)
             if job is None:
                 log.warning(f'No job with ID <{id}> was found!')
             else:
@@ -244,49 +339,44 @@ class Manager():
                     log.warning('Operation was canceled.')
         pass
 
-    def edit_config(self):
-        print('Not configured yet.')
+    def list_jobs(self):
+        """List all jobs in the schedule."""
+        log = self.log
+        operator = self.operator
+        jobs = operator.list_jobs()
+        rows = []
+        for i, job in enumerate(jobs):
+            if i == 0:
+                header = list([key.upper() for key in job.keys()])
+                rows.append(header)
+            data = list([str(cell) for cell in job.values()])
+            rows.append(data)
+
+        if len(rows) >= 1:
+            table = tables.Table(rows=rows)
+            log.write(table)
         pass
 
-#     def edit_job(self, id):
-#         """Open script.py of job in the selected editor."""
-#         # Get all parameters for edition process.
-#         editor = self.config['MANAGER'].get('editor')
-#         script_path = os.path.abspath(f'jobs/{id}/script.py')
-#         self.log.info(f'Editing {script_path}...')
-#         # Launch edition process and wait until it is completed.
-#         parse_process(editor, script_path).wait()
-#         self.log.info('Done!')
-#         pass
-#
-#     def edit_config(self, *args):
-#         """Open config.ini in the selected editor."""
-#         # Get all parameters for edition process.
-#         editor = self.config['MANAGER'].get('editor')
-#         root = self.root
-#         if len(args) == 0:
-#             config_path = os.path.abspath(f'{root}/config.ini')
-#         elif len(args) == 2 and args[0] == 'job':
-#             config_path = os.path.abspath(f'{root}/jobs/{args[1]}/config.ini')
-#         if os.path.exists(config_path) is False:
-#             self.log.critical('No such configuration file!')
-#         else:
-#             self.log.info(f'Editing {config_path}...')
-#             # Launch edition process and wait until it is completed.
-#             parse_process(editor, config_path).wait()
-#             self.log.info('Done!')
-#         pass
-#
-#     def edit_schedule(self):
-#         """Open schedule.tsv in the selected editor."""
-#         # Get all parameters for edition process.
-#         editor = self.config['MANAGER'].get('editor')
-#         # Get scheduler config.
-#         config = Scheduler.parse_config(save = False)
-#         schedule_path = config['SCHEDULER'].get('schedule')
-#         self.log.info(f'Editing {schedule_path}...')
-#         # Launch edition process and wait until it is completed.
-#         parse_process(editor, schedule_path).wait()
-#         self.log.info('Done!')
-#         pass
-#
+    def edit_config(self):
+        """Open config file in the selected editor."""
+        # Get all parameters for edition process.
+        editor = self.config['MANAGER'].get('editor')
+        args = self.log.sysinfo.anons[2:]
+        if len(args) == 0:
+            path = os.path.abspath(f'{self._root}/config.ini')
+        elif len(args) == 1:
+            id = args[0]
+            path = os.path.abspath(f'{self._root}/jobs/{id}/job.ini')
+        self.log.info(f'Editing {path}...')
+        # Launch edition process and wait until it is completed.
+        self.operator.make_process(editor, path).wait()
+        self.log.info('Done!')
+        pass
+
+    @property
+    def root(self):
+        return self._root
+
+    @property
+    def deployed(self):
+        return self._deployed
