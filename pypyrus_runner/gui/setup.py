@@ -1,6 +1,8 @@
 import setuptools
 
-install_requires = ['pyramid', 'pyramid_chameleon', 'waitress']
+install_requires = [
+    'pyramid', 'pyramid_chameleon', 'pyramid_sqlalchemy',
+    'sqlalchemy', 'waitress', 'pypyrus_runner']
 dev_requires = ['pyramid_debugtoolbar']
 extras_require = {'dev': dev_requires}
 entry_points = {'paste.app_factory': ['main = gui:main']}

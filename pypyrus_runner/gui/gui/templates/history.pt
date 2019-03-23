@@ -67,12 +67,14 @@
             <div class="table-head">
               <table>
                 <thead>
+                  ${ structure:thead }
                 </thead>
               </table>
             </div>
             <div class="table-body">
               <table>
                 <tbody>
+                  ${ structure:tbody }
                 </tbody>
               </table>
             </div>
