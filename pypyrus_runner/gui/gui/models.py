@@ -56,8 +56,8 @@ class History(BaseObject):
     initiator = Column(String)
     log = Column(String)
     pid = Column(Integer)
-    start_timestamp = Column(DateTime)
-    end_timestamp = Column(DateTime)
+    start_date = Column(DateTime)
+    end_date = Column(DateTime)
     status = Column(String(1))
 
     def render():
@@ -80,9 +80,9 @@ class History(BaseObject):
                 f'<td class="history-table-initiator">{hist.initiator}</td>',
                 f'<td class="history-table-pid">{hist.pid}</td>',
                 '<td class="history-table-start">'\
-                    f'{hist.start_timestamp: %Y-%m-%d %H:%M:%S}</td>',
+                    f'{hist.start_date: %Y-%m-%d %H:%M:%S}</td>',
                 '<td class="history-table-end">'\
-                    f'{hist.end_timestamp: %Y-%m-%d %H:%M:%S}</td>',
+                    f'{hist.end_date: %Y-%m-%d %H:%M:%S}</td>',
                 f'<td class="history-table-status">{hist.status}</td>']
             trows = ''.join(trows)
             trows = f'<tr>{trows}</tr>'

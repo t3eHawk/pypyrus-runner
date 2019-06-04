@@ -11,7 +11,7 @@ install_requires = [
 author = runner.__author__
 email = runner.__email__
 version = runner.__version__
-description = runner.__desc__
+description = runner.__doc__
 license = runner.__license__
 
 setuptools.setup(
